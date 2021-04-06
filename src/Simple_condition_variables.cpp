@@ -21,7 +21,6 @@ void withdraw(int amount){
 	//the bad idea, a busy wait
 	while (!deposit_made){}		//waiting for deposit made here, PEGS 1 CORE at 100% (see htop)
 								//while holding the mutex
-	lock_guard<mutex> lck(m);	//DEADLOCK maybe move this after following? unproteceted bool then
 	balance-=amount;
 	if (balance <0)
 		cout<<"You are overdrawn"<<endl;
@@ -33,7 +32,6 @@ void deposit(int amount){
 	//deposit is delayed!
 	std::this_thread::sleep_for(std::chrono::milliseconds(5000));
 
-	lock_guard<mutex> lck(m);	//waiting for mutex
 	balance +=amount;
 	deposit_made=true;			//never get here
 }
@@ -50,6 +48,8 @@ void deposit(int amount){
 //		cv.wait(lck);	//if here, release lock
 //						//and then sleep until
 //						//awakened
+//
+//	//if here have reaquired the lock
 //	balance-=amount;
 //	if (balance <0)
 //		cout<<"You are overdrawn"<<endl;
