@@ -18,6 +18,9 @@ int balance = 0;
 bool deposit_made = false;
 
 void withdraw(int amount){
+	//Question- what if you wanted to protect access to deposit_made with a mutex
+	//how would you do it without causing deadlock?  
+	
 	//the bad idea, a busy wait
 	while (!deposit_made){}		//waiting for deposit made here, PEGS 1 CORE at 100% (see htop)
 								//while holding the mutex
