@@ -18,12 +18,14 @@ int balance = 0;
 bool deposit_made = false;
 
 void withdraw(int amount){
-	//Question- what if you wanted to protect access to deposit_made with a mutex
+	//Question- what if you wanted to protect access to deposit_made with mutex m
 	//how would you do it without causing deadlock?  
 	
 	//the bad idea, a busy wait
 	while (!deposit_made){}		//waiting for deposit made here, PEGS 1 CORE at 100% (see htop)
-								//while holding the mutex
+								
+
+	lock_guard<mutex> lck(m);
 	balance-=amount;
 	if (balance <0)
 		cout<<"You are overdrawn"<<endl;
@@ -35,7 +37,10 @@ void deposit(int amount){
 	//deposit is delayed!
 	std::this_thread::sleep_for(std::chrono::milliseconds(5000));
 
-	balance +=amount;
+	{
+		lock_guard<mutex> lck(m);
+		balance +=amount;
+	}
 	deposit_made=true;			//never get here
 }
 
