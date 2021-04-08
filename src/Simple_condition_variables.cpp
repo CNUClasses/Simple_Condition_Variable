@@ -17,47 +17,15 @@ mutex m;
 int balance = 0;
 bool deposit_made = false;
 
-void withdraw(int amount){
-	//Question- what if you wanted to protect access to deposit_made with mutex m
-	//how would you do it without causing deadlock?  
-	
-	//the bad idea, a busy wait
-	while (!deposit_made){}		//waiting for deposit made here, PEGS 1 CORE at 100% (see htop)
-								
-
-	lock_guard<mutex> lck(m);
-	balance-=amount;
-	if (balance <0)
-		cout<<"You are overdrawn"<<endl;
-	else
-		cout<<"no worries"<<endl;
-}
-
-void deposit(int amount){
-	//deposit is delayed!
-	std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-
-	{
-		lock_guard<mutex> lck(m);
-		balance +=amount;
-	}
-	deposit_made=true;			//never get here
-}
-
-//condition_variable cv;
+//A BAD SOLUTION USING A SPINLOCK
 //void withdraw(int amount){
-//	//just like a lock_guard
-//	//PLUS you can manually unlock it!
-//	unique_lock<mutex> lck(m);
-//
-//	//MUST be a loop to handle
-//	//spurious wakeups
-//	while(!deposit_made)
-//		cv.wait(lck);	//if here, release lock
-//						//and then sleep until
-//						//awakened
-//
-//	//if here have reaquired the lock
+//	//Question- what if you wanted to protect access to deposit_made with mutex m
+//	//how would you do it without causing deadlock?  
+//	
+//	//the bad idea, a busy wait
+//	while (!deposit_made){}		//waiting for deposit made here, PEGS 1 CPU CORE at 100% (see htop)
+//								
+//	lock_guard<mutex> lck(m);
 //	balance-=amount;
 //	if (balance <0)
 //		cout<<"You are overdrawn"<<endl;
@@ -66,23 +34,56 @@ void deposit(int amount){
 //}
 //
 //void deposit(int amount){
-//	std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+//	//deposit is delayed!
+//	std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+//
 //	{
 //		lock_guard<mutex> lck(m);
 //		balance +=amount;
-//
-//		//must change condition while locked!
-//		deposit_made=true;
 //	}
-//
-//	//must release lock before notify
-//	//notify_all wakes ALL threads
-//	//waiting on this cv.  One will
-//	//aquire the mutex, check condition
-//	//in while and move forward
-//	//the others go back to sleep
-//	cv.notify_all();
+//	deposit_made=true;			//never get here
 //}
+
+//A MUCH BETTER SOLUTION USING CONDITION VARIABLES
+condition_variable cv;
+void withdraw(int amount){
+	//just like a lock_guard
+	//PLUS you can manually unlock it!
+	unique_lock<mutex> lck(m);
+
+	//MUST be a loop to handle
+	//spurious wakeups
+	while(!deposit_made)
+		cv.wait(lck);	//if here, release lock
+						//and then sleep until
+						//awakened
+
+	//if here have reaquired the lock
+	balance-=amount;
+	if (balance <0)
+		cout<<"You are overdrawn"<<endl;
+	else
+		cout<<"no worries"<<endl;
+}
+
+void deposit(int amount){
+	std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+	{
+		lock_guard<mutex> lck(m);
+		balance +=amount;
+
+		//must change condition while locked!
+		deposit_made=true;
+	}
+
+	//must release lock before notify
+	//notify_all wakes ALL threads
+	//waiting on this cv.  One will
+	//aquire the mutex, check condition
+	//in while and move forward
+	//the others go back to sleep
+	cv.notify_all();
+}
 
 int main() {
 	//how do you ensure you deposit before withdraw?
